@@ -1,16 +1,59 @@
-// Update this page (the content is just a fallback if you fail to update the page)
+import { Shield } from "lucide-react";
+import { useWebRTC } from "@/hooks/useWebRTC";
+import { VideoFeed } from "@/components/VideoFeed";
+import { IntercomControls } from "@/components/IntercomControls";
+import { ConnectionPanel } from "@/components/ConnectionPanel";
 
-// IMPORTANT: Fully REPLACE this with your own code
-const PlaceholderIndex = () => {
-  // PLACEHOLDER: Replace this entire return statement with the user's app.
-  // The inline background color is intentionally not part of the design system.
+const Index = () => {
+  const {
+    videoRef,
+    videoStatus,
+    audioStatus,
+    isMuted,
+    error,
+    connectVideo,
+    connectAudio,
+    disconnectAudio,
+    toggleMute,
+  } = useWebRTC({
+    signalingUrl: "wss://your-signaling-server.example.com",
+    autoConnect: true,
+  });
+
   return (
-    <div className="flex min-h-screen items-center justify-center" style={{ backgroundColor: '#fcfbf8' }}>
-      <img data-lovable-blank-page-placeholder="REMOVE_THIS" src="/placeholder.svg" alt="Your app will live here!" />
+    <div className="min-h-screen flex flex-col">
+      {/* Header */}
+      <header className="glass-surface border-b border-border px-4 py-3 flex items-center justify-between">
+        <div className="flex items-center gap-2">
+          <Shield className="h-5 w-5 text-primary" />
+          <h1 className="font-mono text-sm font-semibold tracking-wider text-foreground uppercase">
+            SecureView
+          </h1>
+        </div>
+        <div className="font-mono text-xs text-muted-foreground">
+          CAM-01
+        </div>
+      </header>
+
+      {/* Main content */}
+      <main className="flex-1 p-4 flex flex-col gap-4 max-w-5xl mx-auto w-full">
+        <VideoFeed videoRef={videoRef} status={videoStatus} />
+        <IntercomControls
+          audioStatus={audioStatus}
+          isMuted={isMuted}
+          onConnect={connectAudio}
+          onDisconnect={disconnectAudio}
+          onToggleMute={toggleMute}
+        />
+        <ConnectionPanel
+          videoStatus={videoStatus}
+          audioStatus={audioStatus}
+          error={error}
+          onReconnect={connectVideo}
+        />
+      </main>
     </div>
   );
 };
-
-const Index = PlaceholderIndex;
 
 export default Index;
