@@ -64,16 +64,17 @@
 }
 
 @layer utilities {
+@layer utilities {
   .glow-green {
-    box-shadow: 0 0 12px 2px hsl(var(--primary) / 0.3);
+    box-shadow: 0 0 12px 2px hsla(142, 70%, 45%, 0.3);
   }
 
   .glow-red {
-    box-shadow: 0 0 12px 2px hsl(var(--destructive) / 0.3);
+    box-shadow: 0 0 12px 2px hsla(0, 72%, 51%, 0.3);
   }
 
   .glass-surface {
-    background: hsl(var(--surface-glass) / 0.8);
+    background: hsla(220, 15%, 12%, 0.8);
     backdrop-filter: blur(12px);
     border: 1px solid hsl(var(--border));
   }
@@ -83,8 +84,8 @@
       0deg,
       transparent,
       transparent 2px,
-      hsl(var(--foreground) / 0.02) 2px,
-      hsl(var(--foreground) / 0.02) 4px
+      hsla(210, 20%, 90%, 0.02) 2px,
+      hsla(210, 20%, 90%, 0.02) 4px
     );
   }
 }
