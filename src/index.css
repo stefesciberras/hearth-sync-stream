@@ -64,7 +64,6 @@
 }
 
 @layer utilities {
-@layer utilities {
   .glow-green {
     box-shadow: 0 0 12px 2px hsla(142, 70%, 45%, 0.3);
   }
