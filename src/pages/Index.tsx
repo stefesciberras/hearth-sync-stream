@@ -51,6 +51,7 @@ const Index = () => {
         <ConnectionPanel
           videoStatus={videoStatus}
           audioStatus={audioStatus}
+          signalingStatus={signalingStatus}
           error={error}
           onReconnect={connectVideo}
         />
