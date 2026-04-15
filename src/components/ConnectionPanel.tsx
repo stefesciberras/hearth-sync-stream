@@ -1,11 +1,13 @@
 import { Settings, RefreshCw } from "lucide-react";
 import { ConnectionStatus } from "@/hooks/useWebRTC";
+import type { JanusConnectionState } from "@/lib/janus";
 import { StatusIndicator } from "./StatusIndicator";
 import { Button } from "@/components/ui/button";
 
 interface ConnectionPanelProps {
   videoStatus: ConnectionStatus;
   audioStatus: ConnectionStatus;
+  signalingStatus?: JanusConnectionState;
   error: string | null;
   onReconnect: () => void;
 }
@@ -13,9 +15,15 @@ interface ConnectionPanelProps {
 export function ConnectionPanel({
   videoStatus,
   audioStatus,
+  signalingStatus,
   error,
   onReconnect,
 }: ConnectionPanelProps) {
+  const signalingAsConnection: ConnectionStatus =
+    signalingStatus === "connected" ? "connected"
+    : signalingStatus === "reconnecting" ? "connecting"
+    : "disconnected";
+
   return (
     <div className="glass-surface rounded-lg p-4 space-y-3">
       <div className="flex items-center justify-between">
@@ -38,6 +46,7 @@ export function ConnectionPanel({
       </div>
 
       <div className="space-y-2">
+        <StatusIndicator status={signalingAsConnection} label="Signaling" />
         <StatusIndicator status={videoStatus} label="Video" />
         <StatusIndicator status={audioStatus} label="Audio" />
       </div>

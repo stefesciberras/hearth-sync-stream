@@ -9,6 +9,7 @@ const Index = () => {
     videoRef,
     videoStatus,
     audioStatus,
+    signalingStatus,
     isMuted,
     error,
     connectVideo,
@@ -17,8 +18,8 @@ const Index = () => {
     toggleMute,
   } = useWebRTC({
     signalingUrl: "wss://your-janus-server.example.com",
-    streamId: 1,           // Janus Streaming plugin mount-point ID
-    audiobridgeRoom: 1234, // Janus AudioBridge room ID
+    streamId: 1,
+    audiobridgeRoom: 1234,
     autoConnect: true,
   });
 
@@ -50,6 +51,7 @@ const Index = () => {
         <ConnectionPanel
           videoStatus={videoStatus}
           audioStatus={audioStatus}
+          signalingStatus={signalingStatus}
           error={error}
           onReconnect={connectVideo}
         />

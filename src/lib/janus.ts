@@ -1,11 +1,5 @@
 /**
- * Janus WebSocket signaling client.
- *
- * Handles:
- *  - Session creation & keep-alive
- *  - Plugin attachment (streaming for video, audiobridge for intercom)
- *  - SDP offer/answer exchange
- *  - Trickle ICE
+ * Janus WebSocket signaling client with automatic reconnection.
  */
 
 export type JanusEventCallback = (msg: JanusMessage, jsep?: RTCSessionDescriptionInit) => void;
@@ -28,6 +22,8 @@ function randomTxId(): string {
   return Math.random().toString(36).substring(2, 14);
 }
 
+export type JanusConnectionState = "connected" | "disconnected" | "reconnecting";
+
 export class JanusSession {
   private ws: WebSocket | null = null;
   private sessionId: number | null = null;
@@ -36,30 +32,80 @@ export class JanusSession {
   private handles = new Map<number, JanusEventCallback>();
   private url: string;
 
+  // Reconnection state
+  private destroyed = false;
+  private reconnectTimer: ReturnType<typeof setTimeout> | null = null;
+  private reconnectAttempt = 0;
+  private readonly maxReconnectDelay = 30_000;
+  private readonly baseReconnectDelay = 1_000;
+  onConnectionStateChange?: (state: JanusConnectionState) => void;
+  onReconnected?: () => void;
+
   constructor(url: string) {
     this.url = url;
   }
 
-  /** Connect WebSocket and create a Janus session */
   async connect(): Promise<number> {
+    this.destroyed = false;
+    this.reconnectAttempt = 0;
+    return this.doConnect();
+  }
+
+  private doConnect(): Promise<number> {
     return new Promise((resolve, reject) => {
       this.ws = new WebSocket(this.url, "janus-protocol");
 
       this.ws.onopen = () => {
         this.send({ janus: "create" }).then((resp) => {
           this.sessionId = resp.data?.id as number;
+          this.reconnectAttempt = 0;
           this.startKeepAlive();
+          this.onConnectionStateChange?.("connected");
           resolve(this.sessionId);
         }).catch(reject);
       };
 
-      this.ws.onerror = (e) => reject(new Error("WebSocket error"));
-      this.ws.onclose = () => this.cleanup();
+      this.ws.onerror = () => {
+        // Only reject the initial connect; reconnects are handled internally
+        if (this.reconnectAttempt === 0) reject(new Error("WebSocket error"));
+      };
+
+      this.ws.onclose = () => {
+        this.cleanupSocket();
+        if (!this.destroyed) {
+          this.scheduleReconnect();
+        }
+      };
+
       this.ws.onmessage = (ev) => this.onMessage(ev);
     });
   }
 
-  /** Attach to a Janus plugin and return the handle id */
+  private scheduleReconnect(): void {
+    if (this.destroyed || this.reconnectTimer) return;
+    this.onConnectionStateChange?.("reconnecting");
+
+    const delay = Math.min(
+      this.baseReconnectDelay * Math.pow(2, this.reconnectAttempt),
+      this.maxReconnectDelay
+    );
+    this.reconnectAttempt++;
+
+    console.log(`[Janus] Reconnecting in ${delay}ms (attempt ${this.reconnectAttempt})`);
+
+    this.reconnectTimer = setTimeout(async () => {
+      this.reconnectTimer = null;
+      if (this.destroyed) return;
+      try {
+        await this.doConnect();
+        // Re-established — notify hook so it can re-attach plugins
+        this.onReconnected?.();
+      } catch {
+        // doConnect failed, onclose will fire again and re-schedule
+      }
+    }, delay);
+  }
+
   async attach(plugin: string, onEvent: JanusEventCallback): Promise<number> {
     const resp = await this.send({
       janus: "attach",
@@ -71,7 +117,6 @@ export class JanusSession {
     return handleId;
   }
 
-  /** Send a message body (+ optional JSEP) to a plugin handle */
   async sendMessage(
     handleId: number,
     body: Record<string, unknown>,
@@ -87,7 +132,6 @@ export class JanusSession {
     return this.send(msg);
   }
 
-  /** Trickle an ICE candidate (or null for end-of-candidates) */
   trickle(handleId: number, candidate: RTCIceCandidate | null): void {
     const msg: Record<string, unknown> = {
       janus: "trickle",
@@ -95,11 +139,9 @@ export class JanusSession {
       handle_id: handleId,
       candidate: candidate ? candidate.toJSON() : { completed: true },
     };
-    // Fire-and-forget
     this.rawSend(msg);
   }
 
-  /** Detach a plugin handle */
   async detach(handleId: number): Promise<void> {
     this.handles.delete(handleId);
     await this.send({
@@ -109,8 +151,12 @@ export class JanusSession {
     }).catch(() => {});
   }
 
-  /** Destroy the session and close the socket */
   destroy(): void {
+    this.destroyed = true;
+    if (this.reconnectTimer) {
+      clearTimeout(this.reconnectTimer);
+      this.reconnectTimer = null;
+    }
     if (this.sessionId && this.ws?.readyState === WebSocket.OPEN) {
       this.rawSend({ janus: "destroy", session_id: this.sessionId });
     }
@@ -157,9 +203,7 @@ export class JanusSession {
       return;
     }
 
-    // Transaction-matched response
     if (msg.transaction && this.transactions.has(msg.transaction)) {
-      // "ack" messages are not final — wait for the actual response
       if (msg.janus === "ack") return;
       const cb = this.transactions.get(msg.transaction)!;
       this.transactions.delete(msg.transaction);
@@ -167,7 +211,6 @@ export class JanusSession {
       return;
     }
 
-    // Asynchronous event routed to a plugin handle
     if (msg.sender && this.handles.has(msg.sender)) {
       const handler = this.handles.get(msg.sender)!;
       handler(msg, msg.jsep);
@@ -175,6 +218,7 @@ export class JanusSession {
   }
 
   private startKeepAlive(): void {
+    if (this.keepAliveTimer) clearInterval(this.keepAliveTimer);
     this.keepAliveTimer = setInterval(() => {
       if (this.ws?.readyState === WebSocket.OPEN && this.sessionId) {
         this.rawSend({ janus: "keepalive", session_id: this.sessionId });
@@ -182,18 +226,24 @@ export class JanusSession {
     }, 25_000);
   }
 
-  private cleanup(): void {
+  /** Clean up socket-level resources without clearing handles (for reconnect) */
+  private cleanupSocket(): void {
     if (this.keepAliveTimer) clearInterval(this.keepAliveTimer);
     this.keepAliveTimer = null;
-    this.transactions.clear();
-    this.handles.clear();
+    this.transactions.forEach((_, key) => this.transactions.delete(key));
     this.sessionId = null;
     if (this.ws) {
       this.ws.onmessage = null;
       this.ws.onclose = null;
       this.ws.onerror = null;
-      if (this.ws.readyState === WebSocket.OPEN) this.ws.close();
       this.ws = null;
     }
+    this.onConnectionStateChange?.("disconnected");
+  }
+
+  /** Full cleanup including handles */
+  private cleanup(): void {
+    this.cleanupSocket();
+    this.handles.clear();
   }
 }
