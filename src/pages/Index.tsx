@@ -16,7 +16,9 @@ const Index = () => {
     disconnectAudio,
     toggleMute,
   } = useWebRTC({
-    signalingUrl: "wss://your-signaling-server.example.com",
+    signalingUrl: "wss://your-janus-server.example.com",
+    streamId: 1,           // Janus Streaming plugin mount-point ID
+    audiobridgeRoom: 1234, // Janus AudioBridge room ID
     autoConnect: true,
   });
 
