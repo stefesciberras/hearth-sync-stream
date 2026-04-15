@@ -15,6 +15,7 @@ export interface JanusMessage {
   transaction?: string;
   session_id?: number;
   sender?: number;
+  data?: { id: number; [key: string]: unknown };
   plugindata?: {
     plugin: string;
     data: Record<string, unknown>;
