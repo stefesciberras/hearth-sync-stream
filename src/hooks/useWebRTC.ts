@@ -6,7 +6,7 @@ export type ConnectionStatus = "disconnected" | "connecting" | "connected" | "er
 
 interface UseWebRTCOptions {
   signalingUrl: string;
-  streamId?: number;
+  videoroomRoom?: number;
   audiobridgeRoom?: number;
   autoConnect?: boolean;
 }
