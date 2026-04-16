@@ -13,7 +13,7 @@ interface UseWebRTCOptions {
 
 export function useWebRTC({
   signalingUrl,
-  streamId = 1,
+  videoroomRoom = 1234,
   audiobridgeRoom = 1234,
   autoConnect = true,
 }: UseWebRTCOptions) {
