@@ -243,8 +243,12 @@ export function useWebRTC({
     try {
       setVideoStatus("connecting");
       const session = janusRef.current;
-      if (!session?.connected) return; // wait for Janus reconnect
-      // Detach old handle if any
+      if (!session?.connected) return;
+      // Detach old handles
+      if (subscriberHandleRef.current) {
+        await session.detach(subscriberHandleRef.current).catch(() => {});
+        subscriberHandleRef.current = null;
+      }
       if (videoHandleRef.current) {
         await session.detach(videoHandleRef.current).catch(() => {});
         videoHandleRef.current = null;
@@ -261,6 +265,10 @@ export function useWebRTC({
     if (videoReconnectTimer.current) {
       clearTimeout(videoReconnectTimer.current);
       videoReconnectTimer.current = null;
+    }
+    if (subscriberHandleRef.current && janusRef.current) {
+      janusRef.current.detach(subscriberHandleRef.current).catch(() => {});
+      subscriberHandleRef.current = null;
     }
     if (videoHandleRef.current && janusRef.current) {
       janusRef.current.detach(videoHandleRef.current).catch(() => {});
