@@ -1,10 +1,14 @@
+import { useState } from "react";
 import { Shield } from "lucide-react";
 import { useWebRTC } from "@/hooks/useWebRTC";
 import { VideoFeed } from "@/components/VideoFeed";
 import { IntercomControls } from "@/components/IntercomControls";
 import { ConnectionPanel } from "@/components/ConnectionPanel";
+import { SettingsPanel, loadConfig, type JanusConfig } from "@/components/SettingsPanel";
 
 const Index = () => {
+  const [config, setConfig] = useState<JanusConfig>(() => loadConfig());
+
   const {
     videoRef,
     videoStatus,
@@ -17,13 +21,15 @@ const Index = () => {
     disconnectAudio,
     toggleMute,
   } = useWebRTC({
-    signalingUrl: "wss://your-janus-server.example.com",
-    videoroomRoom: 1234,
+    // Remount the hook when config changes so the new URL/room take effect cleanly
+    key: `${config.signalingUrl}|${config.videoroomRoom}`,
+    signalingUrl: config.signalingUrl,
+    videoroomRoom: config.videoroomRoom,
     autoConnect: true,
-  });
+  } as never);
 
   return (
-    <div className="min-h-screen flex flex-col">
+    <div className="min-h-screen flex flex-col" key={`${config.signalingUrl}|${config.videoroomRoom}`}>
       {/* Header */}
       <header className="glass-surface border-b border-border px-4 py-3 flex items-center justify-between">
         <div className="flex items-center gap-2">
@@ -32,8 +38,9 @@ const Index = () => {
             SecureView
           </h1>
         </div>
-        <div className="font-mono text-xs text-muted-foreground">
-          CAM-01
+        <div className="flex items-center gap-3">
+          <div className="font-mono text-xs text-muted-foreground">CAM-01</div>
+          <SettingsPanel config={config} onSave={setConfig} />
         </div>
       </header>
 
