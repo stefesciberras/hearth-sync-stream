@@ -19,7 +19,6 @@ const Index = () => {
   } = useWebRTC({
     signalingUrl: "wss://your-janus-server.example.com",
     videoroomRoom: 1234,
-    audiobridgeRoom: 1234,
     autoConnect: true,
   });
 
