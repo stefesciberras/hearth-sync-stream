@@ -147,19 +147,13 @@ export function useWebRTC({
       );
       videoHandleRef.current = handleId;
 
-      // Join the videoroom as a subscriber (listener)
+      // Join as publisher (but don't publish) to discover existing feeds
       await session.sendMessage(handleId, {
         request: "join",
         room: videoroomRoom,
-        ptype: "subscriber",
-        // We'll subscribe to feeds via a separate request
+        ptype: "publisher",
+        display: "secureview-monitor",
       });
-
-      // Actually we need to join as publisher first to discover feeds,
-      // or join directly with a feed. Let's join as subscriber with feed auto-discovery.
-      // Janus videoroom: join as "publisher" to see the list, but we just want to watch.
-      // Better approach: join as publisher (ptype: "publisher") but don't publish,
-      // then subscribe to feeds we discover.
     },
     [videoroomRoom]
   );
