@@ -30,7 +30,7 @@ export function useWebRTC({
   const localStreamRef = useRef<MediaStream | null>(null);
   const wasAudioConnectedRef = useRef(false);
   const destroyedRef = useRef(false);
-  const publisherHandleRef = useRef<number | null>(null);
+  const subscriberHandleRef = useRef<number | null>(null);
 
   const iceServers: RTCIceServer[] = [
     { urls: "stun:stun.l.google.com:19302" },
@@ -156,9 +156,6 @@ export function useWebRTC({
     },
     [videoroomRoom]
   );
-
-  // Keep a separate subscriber handle for the actual media
-  const subscriberHandleRef = useRef<number | null>(null);
 
   const subscribeToFeed = useCallback(
     async (session: JanusSession, feedId: number) => {
