@@ -17,8 +17,8 @@ const Index = () => {
     disconnectAudio,
     toggleMute,
   } = useWebRTC({
-    signalingUrl: "wss://your-janus-server.example.com",
-    videoroomRoom: 1234,
+    signalingUrl: "wss://stefe.duckdns.org",
+    videoroomRoom: 1610,
     autoConnect: true,
   });
 
