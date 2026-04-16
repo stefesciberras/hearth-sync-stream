@@ -17,7 +17,7 @@ const Index = () => {
     disconnectAudio,
     toggleMute,
   } = useWebRTC({
-    signalingUrl: "wss://stefe.duckdns.org",
+    signalingUrl: "wss://192.168.1.133",
     videoroomRoom: 1610,
     autoConnect: true,
   });
