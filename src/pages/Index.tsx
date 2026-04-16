@@ -18,7 +18,7 @@ const Index = () => {
     toggleMute,
   } = useWebRTC({
     signalingUrl: "wss://your-janus-server.example.com",
-    streamId: 1,
+    videoroomRoom: 1234,
     audiobridgeRoom: 1234,
     autoConnect: true,
   });
