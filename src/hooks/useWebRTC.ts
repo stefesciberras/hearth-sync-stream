@@ -6,14 +6,14 @@ export type ConnectionStatus = "disconnected" | "connecting" | "connected" | "er
 
 interface UseWebRTCOptions {
   signalingUrl: string;
-  streamId?: number;
+  videoroomRoom?: number;
   audiobridgeRoom?: number;
   autoConnect?: boolean;
 }
 
 export function useWebRTC({
   signalingUrl,
-  streamId = 1,
+  videoroomRoom = 1234,
   audiobridgeRoom = 1234,
   autoConnect = true,
 }: UseWebRTCOptions) {
@@ -97,7 +97,7 @@ export function useWebRTC({
     []
   );
 
-  // ── Video ───────────────────────────────────────
+  // ── Video (VideoRoom subscriber) ─────────────────
 
   const connectVideo = useCallback(async () => {
     try {
@@ -109,7 +109,7 @@ export function useWebRTC({
       setVideoStatus("error");
       setError(err instanceof Error ? err.message : "Failed to connect video");
     }
-  }, [ensureSession, streamId]);
+  }, [ensureSession, videoroomRoom]);
 
   const attachVideoPlugin = useCallback(
     async (session: JanusSession) => {
@@ -118,27 +118,89 @@ export function useWebRTC({
       videoPcRef.current = null;
 
       const handleId = await session.attach(
-        "janus.plugin.streaming",
-        (msg: JanusMessage, jsep?: RTCSessionDescriptionInit) => {
-          if (jsep && jsep.type === "offer") {
-            handleStreamingOffer(session, handleId, jsep);
+        "janus.plugin.videoroom",
+        async (msg: JanusMessage, jsep?: RTCSessionDescriptionInit) => {
+          const event = msg.plugindata?.data?.videoroom as string | undefined;
+
+          if (event === "attached" && jsep && jsep.type === "offer") {
+            // We got a publisher's offer — create answer
+            await handleSubscriberOffer(session, handleId, jsep);
+          }
+          if (event === "event") {
+            // Check for new publishers we can subscribe to
+            const publishers = msg.plugindata?.data?.publishers as Array<{ id: number }> | undefined;
+            if (publishers && publishers.length > 0) {
+              // Subscribe to the first publisher (single camera)
+              const feedId = publishers[0].id;
+              await subscribeToFeed(session, feedId);
+            }
+          }
+          if (event === "joined") {
+            // We joined as subscriber — check for existing publishers
+            const publishers = msg.plugindata?.data?.publishers as Array<{ id: number }> | undefined;
+            if (publishers && publishers.length > 0) {
+              const feedId = publishers[0].id;
+              await subscribeToFeed(session, feedId);
+            }
           }
         }
       );
       videoHandleRef.current = handleId;
-      await session.sendMessage(handleId, { request: "watch", id: streamId });
+
+      // Join as publisher (but don't publish) to discover existing feeds
+      await session.sendMessage(handleId, {
+        request: "join",
+        room: videoroomRoom,
+        ptype: "publisher",
+        display: "secureview-monitor",
+      });
     },
-    [streamId]
+    [videoroomRoom]
   );
 
-  const handleStreamingOffer = useCallback(
+  // Keep a separate subscriber handle for the actual media
+  const subscriberHandleRef = useRef<number | null>(null);
+
+  const subscribeToFeed = useCallback(
+    async (session: JanusSession, feedId: number) => {
+      // If we already have a subscriber handle, detach it
+      if (subscriberHandleRef.current) {
+        await session.detach(subscriberHandleRef.current).catch(() => {});
+        subscriberHandleRef.current = null;
+      }
+
+      const subHandleId = await session.attach(
+        "janus.plugin.videoroom",
+        async (msg: JanusMessage, jsep?: RTCSessionDescriptionInit) => {
+          const event = msg.plugindata?.data?.videoroom as string | undefined;
+          if (event === "attached" && jsep && jsep.type === "offer") {
+            await handleSubscriberOffer(session, subHandleId, jsep);
+          }
+          if (event === "updated" && jsep && jsep.type === "offer") {
+            await handleSubscriberOffer(session, subHandleId, jsep);
+          }
+        }
+      );
+      subscriberHandleRef.current = subHandleId;
+
+      await session.sendMessage(subHandleId, {
+        request: "join",
+        room: videoroomRoom,
+        ptype: "subscriber",
+        feed: feedId,
+      });
+    },
+    [videoroomRoom]
+  );
+
+  const handleSubscriberOffer = useCallback(
     async (session: JanusSession, handleId: number, offer: RTCSessionDescriptionInit) => {
       try {
         const pc = new RTCPeerConnection({ iceServers });
+        videoPcRef.current?.close();
         videoPcRef.current = pc;
 
         watchIceState(pc, setVideoStatus, "Video", () => {
-          // ICE failed — tear down and retry after a delay
           scheduleVideoReconnect();
         });
 
@@ -181,8 +243,12 @@ export function useWebRTC({
     try {
       setVideoStatus("connecting");
       const session = janusRef.current;
-      if (!session?.connected) return; // wait for Janus reconnect
-      // Detach old handle if any
+      if (!session?.connected) return;
+      // Detach old handles
+      if (subscriberHandleRef.current) {
+        await session.detach(subscriberHandleRef.current).catch(() => {});
+        subscriberHandleRef.current = null;
+      }
       if (videoHandleRef.current) {
         await session.detach(videoHandleRef.current).catch(() => {});
         videoHandleRef.current = null;
@@ -199,6 +265,10 @@ export function useWebRTC({
     if (videoReconnectTimer.current) {
       clearTimeout(videoReconnectTimer.current);
       videoReconnectTimer.current = null;
+    }
+    if (subscriberHandleRef.current && janusRef.current) {
+      janusRef.current.detach(subscriberHandleRef.current).catch(() => {});
+      subscriberHandleRef.current = null;
     }
     if (videoHandleRef.current && janusRef.current) {
       janusRef.current.detach(videoHandleRef.current).catch(() => {});
