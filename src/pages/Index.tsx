@@ -6,9 +6,11 @@ import { IntercomControls } from "@/components/IntercomControls";
 import { ConnectionPanel } from "@/components/ConnectionPanel";
 import { SettingsPanel, loadConfig, type JanusConfig } from "@/components/SettingsPanel";
 
-const Index = () => {
-  const [config, setConfig] = useState<JanusConfig>(() => loadConfig());
+interface DashboardProps {
+  config: JanusConfig;
+}
 
+const Dashboard = ({ config }: DashboardProps) => {
   const {
     videoRef,
     videoStatus,
@@ -21,16 +23,38 @@ const Index = () => {
     disconnectAudio,
     toggleMute,
   } = useWebRTC({
-    // Remount the hook when config changes so the new URL/room take effect cleanly
-    key: `${config.signalingUrl}|${config.videoroomRoom}`,
     signalingUrl: config.signalingUrl,
     videoroomRoom: config.videoroomRoom,
     autoConnect: true,
-  } as never);
+  });
 
   return (
-    <div className="min-h-screen flex flex-col" key={`${config.signalingUrl}|${config.videoroomRoom}`}>
-      {/* Header */}
+    <main className="flex-1 p-4 flex flex-col gap-4 max-w-5xl mx-auto w-full">
+      <VideoFeed videoRef={videoRef} status={videoStatus} />
+      <IntercomControls
+        audioStatus={audioStatus}
+        isMuted={isMuted}
+        onConnect={connectAudio}
+        onDisconnect={disconnectAudio}
+        onToggleMute={toggleMute}
+      />
+      <ConnectionPanel
+        videoStatus={videoStatus}
+        audioStatus={audioStatus}
+        signalingStatus={signalingStatus}
+        error={error}
+        onReconnect={connectVideo}
+      />
+    </main>
+  );
+};
+
+const Index = () => {
+  const [config, setConfig] = useState<JanusConfig>(() => loadConfig());
+  const dashboardKey = `${config.signalingUrl}|${config.videoroomRoom}`;
+
+  return (
+    <div className="min-h-screen flex flex-col">
       <header className="glass-surface border-b border-border px-4 py-3 flex items-center justify-between">
         <div className="flex items-center gap-2">
           <Shield className="h-5 w-5 text-primary" />
@@ -44,24 +68,8 @@ const Index = () => {
         </div>
       </header>
 
-      {/* Main content */}
-      <main className="flex-1 p-4 flex flex-col gap-4 max-w-5xl mx-auto w-full">
-        <VideoFeed videoRef={videoRef} status={videoStatus} />
-        <IntercomControls
-          audioStatus={audioStatus}
-          isMuted={isMuted}
-          onConnect={connectAudio}
-          onDisconnect={disconnectAudio}
-          onToggleMute={toggleMute}
-        />
-        <ConnectionPanel
-          videoStatus={videoStatus}
-          audioStatus={audioStatus}
-          signalingStatus={signalingStatus}
-          error={error}
-          onReconnect={connectVideo}
-        />
-      </main>
+      {/* Remount Dashboard on config change so the WebRTC hook re-initializes cleanly */}
+      <Dashboard key={dashboardKey} config={config} />
     </div>
   );
 };
