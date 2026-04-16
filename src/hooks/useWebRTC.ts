@@ -7,14 +7,12 @@ export type ConnectionStatus = "disconnected" | "connecting" | "connected" | "er
 interface UseWebRTCOptions {
   signalingUrl: string;
   videoroomRoom?: number;
-  audiobridgeRoom?: number;
   autoConnect?: boolean;
 }
 
 export function useWebRTC({
   signalingUrl,
   videoroomRoom = 1234,
-  audiobridgeRoom = 1234,
   autoConnect = true,
 }: UseWebRTCOptions) {
   const [videoStatus, setVideoStatus] = useState<ConnectionStatus>("disconnected");
@@ -32,6 +30,7 @@ export function useWebRTC({
   const localStreamRef = useRef<MediaStream | null>(null);
   const wasAudioConnectedRef = useRef(false);
   const destroyedRef = useRef(false);
+  const publisherHandleRef = useRef<number | null>(null);
 
   const iceServers: RTCIceServer[] = [
     { urls: "stun:stun.l.google.com:19302" },
@@ -280,7 +279,7 @@ export function useWebRTC({
     setVideoStatus("disconnected");
   }, []);
 
-  // ── Audio ───────────────────────────────────────
+  // ── Audio (VideoRoom publisher) ──────────────────
 
   const connectAudio = useCallback(async () => {
     try {
@@ -299,7 +298,7 @@ export function useWebRTC({
       setAudioStatus("error");
       setError(err instanceof Error ? err.message : "Failed to access microphone");
     }
-  }, [ensureSession, audiobridgeRoom]);
+  }, [ensureSession]);
 
   const attachAudioPlugin = useCallback(
     async (session: JanusSession, stream: MediaStream) => {
@@ -311,21 +310,15 @@ export function useWebRTC({
 
       stream.getTracks().forEach((t) => pc.addTrack(t, stream));
 
-      pc.ontrack = (ev) => {
-        const audio = new Audio();
-        audio.srcObject = ev.streams[0];
-        audio.play().catch(() => {});
-      };
-
       const handleId = await session.attach(
-        "janus.plugin.audiobridge",
+        "janus.plugin.videoroom",
         async (msg: JanusMessage, jsep?: RTCSessionDescriptionInit) => {
           if (jsep && jsep.type === "answer" && audioPcRef.current) {
             await audioPcRef.current.setRemoteDescription(
               new RTCSessionDescription(jsep)
             );
           }
-          const event = msg.plugindata?.data?.audiobridge as string | undefined;
+          const event = msg.plugindata?.data?.videoroom as string | undefined;
           if (event === "joined") {
             await sendAudioOffer(session, handleId);
           }
@@ -343,11 +336,12 @@ export function useWebRTC({
 
       await session.sendMessage(handleId, {
         request: "join",
-        room: audiobridgeRoom,
-        muted: isMuted,
+        room: videoroomRoom,
+        ptype: "publisher",
+        display: "secureview-audio",
       });
     },
-    [audiobridgeRoom, isMuted]
+    [videoroomRoom, isMuted]
   );
 
   const sendAudioOffer = useCallback(
@@ -357,7 +351,11 @@ export function useWebRTC({
       try {
         const offer = await pc.createOffer();
         await pc.setLocalDescription(offer);
-        await session.sendMessage(handleId, { request: "configure", muted: isMuted }, offer);
+        await session.sendMessage(
+          handleId,
+          { request: "configure", audio: true, video: false },
+          offer
+        );
         setAudioStatus("connected");
       } catch (err) {
         setAudioStatus("error");
@@ -430,7 +428,8 @@ export function useWebRTC({
     if (audioHandleRef.current && janusRef.current) {
       janusRef.current.sendMessage(audioHandleRef.current, {
         request: "configure",
-        muted: newMuted,
+        audio: !newMuted,
+        video: false,
       });
     }
   }, [isMuted]);
