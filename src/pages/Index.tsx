@@ -5,6 +5,7 @@ import { VideoFeed } from "@/components/VideoFeed";
 import { IntercomControls } from "@/components/IntercomControls";
 import { ConnectionPanel } from "@/components/ConnectionPanel";
 import { SettingsPanel, loadConfig, type JanusConfig } from "@/components/SettingsPanel";
+import { DebugPanel } from "@/components/DebugPanel";
 
 interface DashboardProps {
   config: JanusConfig;
@@ -46,6 +47,7 @@ const Dashboard = ({ config }: DashboardProps) => {
         error={error}
         onReconnect={connectVideo}
       />
+      <DebugPanel />
     </main>
   );
 };

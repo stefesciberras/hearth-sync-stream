@@ -1,6 +1,7 @@
 import { useState, useRef, useCallback, useEffect } from "react";
 import { JanusSession } from "@/lib/janus";
 import type { JanusMessage, JanusConnectionState } from "@/lib/janus";
+import { debugLog } from "@/lib/debugLog";
 
 export type ConnectionStatus = "disconnected" | "connecting" | "connected" | "error";
 
@@ -80,6 +81,7 @@ export function useWebRTC({
       onFailed?: () => void
     ) => {
       pc.oniceconnectionstatechange = () => {
+        debugLog.info("WebRTC", `${label} ICE state: ${pc.iceConnectionState}`);
         switch (pc.iceConnectionState) {
           case "connected":
           case "completed":
@@ -88,6 +90,7 @@ export function useWebRTC({
           case "failed":
             setStatus("error");
             setError(`${label} connection failed`);
+            debugLog.error("WebRTC", `${label} ICE failed`);
             onFailed?.();
             break;
           case "closed":
@@ -99,6 +102,20 @@ export function useWebRTC({
             break;
         }
       };
+      pc.onconnectionstatechange = () => {
+        debugLog.debug("WebRTC", `${label} PC state: ${pc.connectionState}`);
+      };
+      pc.onicegatheringstatechange = () => {
+        debugLog.debug("WebRTC", `${label} ICE gathering: ${pc.iceGatheringState}`);
+      };
+      pc.onicecandidateerror = (ev) => {
+        const e = ev as RTCPeerConnectionIceErrorEvent;
+        debugLog.warn("WebRTC", `${label} ICE candidate error`, {
+          url: e.url,
+          errorCode: e.errorCode,
+          errorText: e.errorText,
+        });
+      };
     },
     []
   );
@@ -109,11 +126,14 @@ export function useWebRTC({
     try {
       setVideoStatus("connecting");
       setError(null);
+      debugLog.info("Video", `Connecting to room ${videoroomRoom}`);
       const session = await ensureSession();
       await attachVideoPlugin(session);
     } catch (err) {
       setVideoStatus("error");
-      setError(err instanceof Error ? err.message : "Failed to connect video");
+      const msg = err instanceof Error ? err.message : "Failed to connect video";
+      setError(msg);
+      debugLog.error("Video", "Connect failed", msg);
     }
   }, [ensureSession, videoroomRoom]);
 
@@ -290,17 +310,21 @@ export function useWebRTC({
       setAudioStatus("connecting");
       setError(null);
       wasAudioConnectedRef.current = true;
+      debugLog.info("Audio", "Requesting microphone");
 
       const session = await ensureSession();
 
       const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
       localStreamRef.current = stream;
       stream.getAudioTracks().forEach((t) => (t.enabled = false));
+      debugLog.info("Audio", `Microphone acquired (${stream.getAudioTracks().length} track[s])`);
 
       await attachAudioPlugin(session, stream);
     } catch (err) {
       setAudioStatus("error");
-      setError(err instanceof Error ? err.message : "Failed to access microphone");
+      const msg = err instanceof Error ? err.message : "Failed to access microphone";
+      setError(msg);
+      debugLog.error("Audio", "Connect failed", msg);
     }
   }, [ensureSession]);
 
