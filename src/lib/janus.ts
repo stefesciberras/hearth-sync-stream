@@ -1,6 +1,7 @@
 /**
  * Janus WebSocket signaling client with automatic reconnection.
  */
+import { debugLog } from "./debugLog";
 
 export type JanusEventCallback = (msg: JanusMessage, jsep?: RTCSessionDescriptionInit) => void;
 
@@ -53,24 +54,32 @@ export class JanusSession {
 
   private doConnect(): Promise<number> {
     return new Promise((resolve, reject) => {
+      debugLog.info("Janus", `Opening WebSocket → ${this.url}`);
       this.ws = new WebSocket(this.url, "janus-protocol");
 
       this.ws.onopen = () => {
+        debugLog.info("Janus", "WebSocket open, creating session");
         this.send({ janus: "create" }).then((resp) => {
           this.sessionId = resp.data?.id as number;
           this.reconnectAttempt = 0;
           this.startKeepAlive();
           this.onConnectionStateChange?.("connected");
+          debugLog.info("Janus", `Session created id=${this.sessionId}`);
           resolve(this.sessionId);
-        }).catch(reject);
+        }).catch((err) => {
+          debugLog.error("Janus", "Session create failed", String(err));
+          reject(err);
+        });
       };
 
-      this.ws.onerror = () => {
+      this.ws.onerror = (ev) => {
+        debugLog.error("Janus", "WebSocket error", { type: (ev as Event).type });
         // Only reject the initial connect; reconnects are handled internally
         if (this.reconnectAttempt === 0) reject(new Error("WebSocket error"));
       };
 
-      this.ws.onclose = () => {
+      this.ws.onclose = (ev) => {
+        debugLog.warn("Janus", `WebSocket closed code=${ev.code} reason=${ev.reason || "(none)"}`);
         this.cleanupSocket();
         if (!this.destroyed) {
           this.scheduleReconnect();
@@ -91,7 +100,7 @@ export class JanusSession {
     );
     this.reconnectAttempt++;
 
-    console.log(`[Janus] Reconnecting in ${delay}ms (attempt ${this.reconnectAttempt})`);
+    debugLog.info("Janus", `Reconnecting in ${delay}ms (attempt ${this.reconnectAttempt})`);
 
     this.reconnectTimer = setTimeout(async () => {
       this.reconnectTimer = null;
