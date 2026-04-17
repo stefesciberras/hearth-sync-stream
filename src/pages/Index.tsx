@@ -6,6 +6,7 @@ import { IntercomControls } from "@/components/IntercomControls";
 import { ConnectionPanel } from "@/components/ConnectionPanel";
 import { SettingsPanel, loadConfig, type JanusConfig } from "@/components/SettingsPanel";
 import { DebugPanel } from "@/components/DebugPanel";
+import { ConnectedUsers } from "@/components/ConnectedUsers";
 
 interface DashboardProps {
   config: JanusConfig;
@@ -33,6 +34,7 @@ const Dashboard = ({ config }: DashboardProps) => {
   return (
     <main className="flex-1 p-4 flex flex-col gap-4 max-w-5xl mx-auto w-full">
       <VideoFeed videoRef={videoRef} status={videoStatus} />
+      <ConnectedUsers />
       <IntercomControls
         audioStatus={audioStatus}
         isMuted={isMuted}
