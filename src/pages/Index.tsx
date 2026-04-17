@@ -25,6 +25,7 @@ const Dashboard = ({ config }: DashboardProps) => {
   } = useWebRTC({
     signalingUrl: config.signalingUrl,
     videoroomRoom: config.videoroomRoom,
+    iceServers: config.iceServers,
     autoConnect: true,
   });
 
@@ -51,7 +52,7 @@ const Dashboard = ({ config }: DashboardProps) => {
 
 const Index = () => {
   const [config, setConfig] = useState<JanusConfig>(() => loadConfig());
-  const dashboardKey = `${config.signalingUrl}|${config.videoroomRoom}`;
+  const dashboardKey = `${config.signalingUrl}|${config.videoroomRoom}|${JSON.stringify(config.iceServers)}`;
 
   return (
     <div className="min-h-screen flex flex-col">

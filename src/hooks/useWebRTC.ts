@@ -8,12 +8,18 @@ interface UseWebRTCOptions {
   signalingUrl: string;
   videoroomRoom?: number;
   autoConnect?: boolean;
+  iceServers?: RTCIceServer[];
 }
+
+const DEFAULT_ICE_SERVERS: RTCIceServer[] = [
+  { urls: "stun:stun.l.google.com:19302" },
+];
 
 export function useWebRTC({
   signalingUrl,
   videoroomRoom = 1234,
   autoConnect = true,
+  iceServers: iceServersOption,
 }: UseWebRTCOptions) {
   const [videoStatus, setVideoStatus] = useState<ConnectionStatus>("disconnected");
   const [audioStatus, setAudioStatus] = useState<ConnectionStatus>("disconnected");
@@ -32,9 +38,10 @@ export function useWebRTC({
   const destroyedRef = useRef(false);
   const subscriberHandleRef = useRef<number | null>(null);
 
-  const iceServers: RTCIceServer[] = [
-    { urls: "stun:stun.l.google.com:19302" },
-  ];
+  const iceServers: RTCIceServer[] =
+    iceServersOption && iceServersOption.length > 0
+      ? iceServersOption
+      : DEFAULT_ICE_SERVERS;
 
   // ── Helpers ─────────────────────────────────────
 
