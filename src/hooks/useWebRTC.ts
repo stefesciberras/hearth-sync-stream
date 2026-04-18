@@ -466,6 +466,7 @@ export function useWebRTC({
 
   useEffect(() => {
     destroyedRef.current = false;
+    debugLog.info("WebRTC", `Hook initialized with signalingUrl=${signalingUrl} room=${videoroomRoom}`);
     if (autoConnect) {
       connectVideo();
     }
