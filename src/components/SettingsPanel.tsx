@@ -38,9 +38,12 @@ const STORAGE_KEY = "secureview.janus.config";
 export function loadConfig(): JanusConfig {
   try {
     const raw = localStorage.getItem(STORAGE_KEY);
-    if (!raw) return DEFAULT_CONFIG;
+    if (!raw) {
+      console.log("[Settings] No saved config — using DEFAULT (example URL)");
+      return DEFAULT_CONFIG;
+    }
     const parsed = JSON.parse(raw) as Partial<JanusConfig>;
-    return {
+    const result = {
       signalingUrl: parsed.signalingUrl || DEFAULT_CONFIG.signalingUrl,
       videoroomRoom:
         typeof parsed.videoroomRoom === "number"
@@ -51,7 +54,10 @@ export function loadConfig(): JanusConfig {
           ? parsed.iceServers
           : DEFAULT_CONFIG.iceServers,
     };
-  } catch {
+    console.log("[Settings] Loaded config from localStorage:", result);
+    return result;
+  } catch (err) {
+    console.warn("[Settings] Failed to parse saved config, using default:", err);
     return DEFAULT_CONFIG;
   }
 }
@@ -134,6 +140,7 @@ export function SettingsPanel({ config, onSave }: SettingsPanelProps) {
       iceServers: cleaned,
     };
     localStorage.setItem(STORAGE_KEY, JSON.stringify(next));
+    console.log("[Settings] Saved new config:", next);
     onSave(next);
     setOpen(false);
     toast({
