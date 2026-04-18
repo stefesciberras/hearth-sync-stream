@@ -169,6 +169,13 @@ export class JanusSession {
     if (this.sessionId && this.ws?.readyState === WebSocket.OPEN) {
       this.rawSend({ janus: "destroy", session_id: this.sessionId });
     }
+    // Force-close any in-flight or open socket so a stale CONNECTING
+    // attempt to the previous URL cannot keep firing events.
+    try {
+      this.ws?.close();
+    } catch {
+      /* ignore */
+    }
     this.cleanup();
   }
 
