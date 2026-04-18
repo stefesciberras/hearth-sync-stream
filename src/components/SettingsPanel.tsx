@@ -140,6 +140,7 @@ export function SettingsPanel({ config, onSave }: SettingsPanelProps) {
       iceServers: cleaned,
     };
     localStorage.setItem(STORAGE_KEY, JSON.stringify(next));
+    console.log("[Settings] Saved new config:", next);
     onSave(next);
     setOpen(false);
     toast({
